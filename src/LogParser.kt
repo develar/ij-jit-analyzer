@@ -40,18 +40,21 @@ private class TaskTable(private val appender: DuckDBAppender) {
 
 private data class Field(@JvmField val name: String, @JvmField val type: String)
 
+private const val taskTableName = "tasks"
+
 private fun taskTableSql(fields: List<Field>): String {
-  return "drop table if exists task; create table task (${fields.joinToString(separator = ", ") { "${it.name.lowercase()} ${it.type}" }})"
+  return "create table $taskTableName (${fields.joinToString(separator = ", ") { "${it.name.lowercase()} ${it.type}" }})"
 }
 
+// https://wiki.openjdk.org/display/HotSpot/LogCompilation+overview
 class LogParser {
   private val runCountProvider = HashMap<String, Int>()
 
   fun parseLine() {
-    val dbFile = Path.of("log.db").toAbsolutePath()
+    val dbFile = Path.of("log.duckdb").toAbsolutePath()
     Files.deleteIfExists(dbFile)
-    //val connection = DriverManager.getConnection("jdbc:sqlite:$dbFile?journal_mode=off")
     val connection = DriverManager.getConnection("jdbc:duckdb:$dbFile") as DuckDBConnection
+    //val connection = DriverManager.getConnection("jdbc:duckdb:") as DuckDBConnection
     connection.use {
       val factory = { name: String, type: String -> Field(name, type) }
       val taskFields: List<Field> = listOf(
@@ -71,7 +74,7 @@ class LogParser {
       )
       connection.createStatement().use { it.executeUpdate(taskTableSql(taskFields)) }
 
-      val appender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "task")
+      val appender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, taskTableName)
       appender.use {
         val taskTable = TaskTable(appender)
         val logFiles = Files.newDirectoryStream(Path.of("logs").toAbsolutePath(), "*.log").use { stream -> stream.toList().sortedBy { Files.getLastModifiedTime(it) } }
@@ -87,6 +90,11 @@ class LogParser {
           }
         }
       }
+
+      //connection.createStatement().use {
+      //  //language=GenericSQL
+      //  it.executeUpdate("copy (select * from task) to 'sources/log/tasks.parquet' (format parquet, compression uncompressed)")
+      //}
     }
   }
 }
@@ -186,7 +194,7 @@ private fun readTaskAttributes(reader: XMLStreamReader2, task: TaskTable): Long 
     }
   }
 
-  assert(startTime>= -0)
+  assert(startTime >= -0)
   task.beginRow(compileId, method, kind, level)
   return startTime
 }

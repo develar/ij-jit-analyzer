@@ -1,21 +1,21 @@
-import { defineConfig } from 'vitepress'
+import { defineConfig } from "vitepress"
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "JIT Insights",
+  srcDir: "pages",
+  cleanUrls: true,
   description: "JIT compilation log analyzer",
   themeConfig: {
-    // https://vitepress.dev/reference/default-theme-config
-    nav: [
-      { text: 'Home', link: '/' },
-    ],
+    sidebar: [
+      {text: "Introduction", link: "/"},
+      {text: "Spent Time", link: "/duration"},
+      {text: "Timeline", link: "/timeline"},
+    ]
   },
   vite: {
-    build: {
-      // https://github.com/mapbox/node-pre-gyp/issues/661
-      rollupOptions: {
-        external: ["node:mock-aws-s3", "node:nock", "node:aws-sdk", "node:@mapbox/node-pre-gyp"],
-      }
-    }
+    ssr: {
+      noExternal: ["echarts", "zrender"],
+    },
   },
 })
