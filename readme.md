@@ -1,3 +1,10 @@
+## Install
+
+Install [PNPM](https://pnpm.io/installation) and then run:
+
+`pnpm install`
+`pnpm sources`
+
 ## Questions
 
 ### How much time consumed for JIT compilation?
@@ -10,6 +17,3 @@ Open [mb.sh](mb.sh) and run `curl` command (assume that you have [Shell Script](
 
 ## Update DB
 
-Open http://localhost:3000/admin/databases/2 and trigger re-scan for scheme and/or field values.
-
-// https://github.com/juba/pyobsplot

@@ -1,21 +1,19 @@
 {
   "name": "jit-analyzer",
-  "version": "1.0.0",
-  "private": "true",
+  "version": "0.0.1",
   "scripts": {
-    "dev": "vitepress dev",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
+    "build": "evidence build",
+    "build:strict": "evidence build:strict",
+    "dev": "evidence dev --open /",
+    "test": "evidence build",
+    "sources": "evidence sources",
+    "check-node-version": "node -v"
   },
-  "trustedDependencies": ["duckdb"],
+  "type": "module",
   "dependencies": {
-    "echarts": "^5.4.3"
+    "@evidence-dev/core-components": "^3.0.4",
+    "@evidence-dev/duckdb": "^1.0.3",
+    "@evidence-dev/evidence": "^24.0.7"
   },
-  "devDependencies": {
-    "duckdb": "^0.9.2",
-    "@types/node": "^20.11.0",
-    "vitepress": "^1.0.0-rc.36",
-    "vue": "^3.4.13",
-    "duckdb-async": "^0.9.2"
-  }
+  "trustedDependencies": ["duckdb"]
 }

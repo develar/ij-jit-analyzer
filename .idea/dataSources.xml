@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="log.db" read-only="true" uuid="5da28851-3a06-4d21-a4bc-c215e05a90b5">
+    <data-source source="LOCAL" name="log.duckdb" read-only="true" uuid="5da28851-3a06-4d21-a4bc-c215e05a90b5">
       <driver-ref>duckdb</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.duckdb.DuckDBDriver</jdbc-driver>
-      <jdbc-url>jdbc:duckdb:$PROJECT_DIR$/log.db</jdbc-url>
+      <jdbc-url>jdbc:duckdb:$PROJECT_DIR$/sources/log/log.duckdb</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>

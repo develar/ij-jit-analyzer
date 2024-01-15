@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "customFormats": [
+    {
+      "formatTag": "duration",
+      "formatCode": "#,##0\" ms\"",
+      "valueType": "number"
+    }
+  ]
+}

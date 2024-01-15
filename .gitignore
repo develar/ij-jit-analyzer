@@ -2,10 +2,14 @@ out/
 bin/
 .DS_Store
 .idea/workspace.xml
-.idea/dataSources
+.idea/dataSources/
 .idea/dataSources.local.xml
 logs/
-*.db
+*.duckdb
+*.duckdb.wal
 .vitepress/dist/
 .vitepress/cache/
 node_modules/
+
+static/data/
+.evidence/template/
