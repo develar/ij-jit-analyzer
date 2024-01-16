@@ -12,11 +12,11 @@ import { useData } from "vitepress"
 
 use([TooltipComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer])
 
-const props = defineProps({
-  x: {type: String, required: true},
-  y: {type: String, required: true},
-  series: {type: String, required: false},
-  data: {type: Object, required: true},
+const props = withDefaults(defineProps<{
+  data: object
+  endLabel?: boolean
+}>(), {
+  endLabel: true,
 })
 
 const chartContainer = ref(null)
@@ -63,24 +63,15 @@ onBeforeUnmount(() => {
 })
 
 function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
-  if (props.series == undefined) {
-    return initNonStackedChart(container, isDark)
-  }
-  else {
-    return initStackedChart(container, isDark)
-  }
-}
-
-function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsType {
-  throw Error("unsupported")
-}
-
-function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
   const data = props.data as Array<[string, Array<any>]>
 
-  const legendState = {}
-  for (const it of data) {
-    legendState[it[0]] = it[0].endsWith(" (1)")
+  const legend: object = {}
+  if (data.some(it => it[0].match(/ \(\d+\)$/))) {
+    const legendState = {}
+    for (const it of data) {
+      legendState[it[0]] = it[0].endsWith(" (1)")
+    }
+    legend.selected = legendState
   }
 
   const option = {
@@ -91,9 +82,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       trigger: "axis",
     },
     yAxis: {},
-    legend: {
-      selected: legendState,
-    },
+    legend,
     series: data.map(item => {
       return {
         name: item[0],
@@ -102,7 +91,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
         sampling: "lttb",
         showSymbol: false,
         endLabel: {
-          show: true,
+          show: props.endLabel,
           formatter: "{a}",
         },
       }

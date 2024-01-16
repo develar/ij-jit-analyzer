@@ -4,6 +4,7 @@ import org.duckdb.DuckDBConnection
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.DriverManager
+import javax.swing.text.html.HTML.Tag.SELECT
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamConstants.START_ELEMENT
 
@@ -21,18 +22,17 @@ private class TaskTable(private val appender: DuckDBAppender) {
     appender.append(level)
   }
 
-  fun endRow(run: String, failure: String?, start: Long, duration: Long, nativeMethodSize: Int, inlinedMethodSize: Int) {
-    appender.append(run)
+  fun endRow(runId: Int, failure: String?, start: Long, duration: Long, nativeMethodSize: Int, inlinedMethodSize: Int, threadId: Int) {
+    appender.append(runId)
     appender.append(failure)
 
     appender.append(start)
-    if (duration == -624373000L) {
-      error("sd")
-    }
     appender.append(duration)
 
     appender.append(nativeMethodSize)
     appender.append(inlinedMethodSize)
+
+    appender.append(threadId)
 
     appender.endRow()
   }
@@ -42,8 +42,8 @@ private data class Field(@JvmField val name: String, @JvmField val type: String)
 
 private const val taskTableName = "tasks"
 
-private fun taskTableSql(fields: List<Field>): String {
-  return "create table $taskTableName (${fields.joinToString(separator = ", ") { "${it.name.lowercase()} ${it.type}" }})"
+private fun tableSql(name: String, fields: List<Field>): String {
+  return "create table $name (${fields.joinToString(separator = ", ") { "${it.name.lowercase()} ${it.type}" }})"
 }
 
 // https://wiki.openjdk.org/display/HotSpot/LogCompilation+overview
@@ -52,63 +52,119 @@ class LogParser {
 
   fun parseLine() {
     val dbFile = Path.of("log.duckdb").toAbsolutePath()
+    println("Write to $dbFile")
     Files.deleteIfExists(dbFile)
     val connection = DriverManager.getConnection("jdbc:duckdb:$dbFile") as DuckDBConnection
     //val connection = DriverManager.getConnection("jdbc:duckdb:") as DuckDBConnection
     connection.use {
       val factory = { name: String, type: String -> Field(name, type) }
+
+      val runIdField = factory("runId", "UINTEGER not null")
+      val threadIdField = factory("threadId", "UINTEGER not null")
+
       val taskFields: List<Field> = listOf(
-        factory("id", "UINTEGER"),
-        factory("method", "VARCHAR"),
+        factory("id", "UINTEGER not null"),
+        factory("method", "VARCHAR not null"),
         factory("kind", "VARCHAR"),
         factory("level", "UTINYINT"),
 
-        factory("run", "VARCHAR"),
+        runIdField,
         factory("failure", "VARCHAR"),
 
-        factory("start", "UBIGINT"),
-        factory("duration", "UINTEGER"),
+        // in microseconds
+        factory("start", "UBIGINT not null"),
+        factory("duration", "UINTEGER not null"),
 
         factory("nativeMethodSize", "UINTEGER"),
         factory("inlinedMethodSize", "UINTEGER"),
-      )
-      connection.createStatement().use { it.executeUpdate(taskTableSql(taskFields)) }
 
-      val appender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, taskTableName)
-      appender.use {
-        val taskTable = TaskTable(appender)
+        threadIdField,
+      )
+
+      val threadFields: List<Field> = listOf(
+        threadIdField,
+        runIdField,
+        factory("name", "VARCHAR not null"),
+        // in microseconds
+        factory("start", "UBIGINT not null"),
+      )
+
+      // no need to use a separate table as DuckDB stores repetitive strings efficiently (see https://duckdb.org/2022/10/28/lightweight-compression.html),
+      // but we need to store metadata for run
+      val runFields: List<Field> = listOf(
+        // use runId instead of id to be able to use the simpler USING syntax
+        runIdField,
+        factory("name", "VARCHAR not null"),
+        // in milliseconds
+        factory("start", "UBIGINT not null"),
+      )
+
+      connection.createStatement().use {
+        it.executeUpdate(tableSql(taskTableName, taskFields))
+        it.executeUpdate(tableSql("threads", threadFields))
+        it.executeUpdate(tableSql("runs", runFields))
+      }
+
+      val taskAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, taskTableName)
+      val threadAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "threads")
+      val runAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "runs")
+      try {
+        val taskTable = TaskTable(taskAppender)
         val logFiles = Files.newDirectoryStream(Path.of("logs").toAbsolutePath(), "*.log").use { stream -> stream.toList().sortedBy { Files.getLastModifiedTime(it) } }
 
         connection.autoCommit = false
+        var runId = 0
         for (logFile in logFiles) {
           val reader = createXmlReader(inputStream = Files.newInputStream(logFile), publicId = logFile.fileName.toString())
           try {
-            read(reader, taskTable, runCountProvider)
+            read(
+              runId = runId++,
+              reader = reader,
+              task = taskTable,
+              runCountProvider = runCountProvider,
+              threadAppender = threadAppender,
+              runAppender = runAppender,
+            )
           }
           finally {
             reader.closeCompletely()
           }
         }
       }
-
-      //connection.createStatement().use {
-      //  //language=GenericSQL
-      //  it.executeUpdate("copy (select * from task) to 'sources/log/tasks.parquet' (format parquet, compression uncompressed)")
-      //}
+      finally {
+        taskAppender.close()
+        threadAppender.close()
+        runAppender.close()
+      }
     }
   }
 }
 
-private fun read(reader: XMLStreamReader2, task: TaskTable, runCountProvider: MutableMap<String, Int>) {
+private fun read(
+  runId: Int,
+  reader: XMLStreamReader2,
+  task: TaskTable,
+  runCountProvider: MutableMap<String, Int>,
+  threadAppender: DuckDBAppender,
+  runAppender: DuckDBAppender,
+) {
   var run = ""
+  var vmStart = -1L
+
+  var threadId = -1
+  var threadName = ""
+
   while (reader.hasNext()) {
     val state = reader.next()
     when (state) {
       START_ELEMENT -> {
         when (reader.localName) {
           "hotspot_log" -> {
-            //val a = readAttributes(reader)
-            //time = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(Instant.ofEpochMilli(a.get("time_ms")!!.toLong()).atZone(ZoneId.systemDefault()))
+            for (i in 0..<reader.attributeCount) {
+              when (reader.getAttributeLocalName(i)) {
+                "time_ms" -> vmStart = reader.getAttributeAsLong(i)
+              }
+            }
           }
 
           "vm_version" -> {
@@ -129,6 +185,32 @@ private fun read(reader: XMLStreamReader2, task: TaskTable, runCountProvider: Mu
             }
 
             run += " (" + runCountProvider.compute(run) { _, value -> (value ?: 0) + 1 } + ")"
+
+            assert(vmStart != -1L)
+            runAppender.beginRow()
+            runAppender.append(runId)
+            runAppender.append(run)
+            runAppender.append(vmStart)
+            runAppender.endRow()
+          }
+
+          "start_compile_thread" -> {
+            var start = -1L
+            for (i in 0..<reader.attributeCount) {
+              when (reader.getAttributeLocalName(i)) {
+                "name" -> threadName = reader.getAttributeValue(i)
+                "thread" -> threadId = reader.getAttributeAsInt(i)
+                "stamp" -> start = convertSecondsToMicroseconds(reader.getAttributeAsDouble(i))
+              }
+            }
+
+            // maybe not distinct, that's ok, do not complicate
+            threadAppender.beginRow()
+            threadAppender.append(threadId)
+            threadAppender.append(runId)
+            threadAppender.append(threadName)
+            threadAppender.append(start)
+            threadAppender.endRow()
           }
 
           "properties" -> {
@@ -165,7 +247,16 @@ private fun read(reader: XMLStreamReader2, task: TaskTable, runCountProvider: Mu
             val end = convertSecondsToMicroseconds(task_done.getAttributeValue("stamp")!!.toDouble())
             val duration = end - start
             assert(duration >= 0)
-            task.endRow(run, failure, start, duration, nativeMethodSize, inlinedMethodSize)
+            assert(threadId >= 0)
+            task.endRow(
+              runId = runId,
+              failure = failure,
+              start = start,
+              duration = duration,
+              nativeMethodSize = nativeMethodSize,
+              inlinedMethodSize = inlinedMethodSize,
+              threadId = threadId,
+            )
           }
         }
       }

@@ -2,7 +2,7 @@
 
 <script setup>
 
-import { data } from "./components/duration.data"
+import { data } from "./duration.data"
 import BarChart from "./components/BarChart.vue"
 
 </script>

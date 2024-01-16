@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Generate log.duckdb" type="JetRunConfigurationType">
+    <option name="MAIN_CLASS_NAME" value="LogParserKt" />
+    <module name="jit-analyzer" />
+    <option name="PROGRAM_PARAMETERS" value="$PROJECT_DIR$/../idea/hotspot_pid24047.log" />
+    <shortenClasspath name="NONE" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,4 +1,4 @@
-## Run Name Glossary
+# Run Name Glossary
 
 * `(N)` represents the number of a run, for example, `(1)`. The number generally goes up to 3.
 * `ccN` signifies that the VM option `-XX:CICompilerCount=N` was employed. For instance, `cc2` indicates that `-XX:CICompilerCount=2` was used.

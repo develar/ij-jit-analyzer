@@ -1,19 +1,14 @@
-## Install
+## Converting JVM Compilation Logs to Database
+The front-end utilizes `log.duckdb`. To put this into operation:
+1. Place the log files in the `logs` directory.
+2. Open the project in IntelliJ IDEA and run the `Generate log.duckdb` configuration.
 
-Install [PNPM](https://pnpm.io/installation) and then run:
+## Run UI
+1. Install [bun](https://bun.sh/docs/installation#installing).
+2. Run the command `bun install`.
+3. Run the command `bun dev`.
+4. Open `http://localhost:5173/` in your web browser.
 
-`pnpm install`
-`pnpm sources`
-
-## Questions
-
-### How much time consumed for JIT compilation?
-
-Duration for a compilation task is computed as `task.task_done.stamp` - `task.stamp`.
-
-## Download Metabase
-
-Open [mb.sh](mb.sh) and run `curl` command (assume that you have [Shell Script](https://plugins.jetbrains.com/plugin/13122-shell-script) plugin enabled).
-
-## Update DB
-
+## Development
+When writing SQL queries or setting up ECharts, consider using [JetBrains AI](https://www.jetbrains.com/ai/).
+JetBrains AI supports both DuckDB and ECharts, so it can provide assistance from general support to specific syntax requirements.

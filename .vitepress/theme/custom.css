@@ -1,0 +1,10 @@
+:root {
+  --vp-font-family-base: InterVariable, system-ui;
+
+  /* clear design - remove gray background */
+  --vp-c-bg-alt: unset;
+
+  /* clear design - remove gray background and add 1px border */
+  --vp-custom-block-details-bg: unset;
+  --vp-custom-block-details-border: var(--vp-c-divider)
+}

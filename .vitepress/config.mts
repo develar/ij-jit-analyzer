@@ -8,9 +8,15 @@ export default defineConfig({
   description: "JIT compilation log analyzer",
   themeConfig: {
     sidebar: [
-      {text: "Introduction", link: "/"},
+      {text: "Glossary", link: "/"},
       {text: "Spent Time", link: "/duration"},
-      {text: "Timeline", link: "/timeline"},
+      {
+        text: "Timeline",
+        link: "/timeline",
+        items:[
+          {text: "Timeline by Thread", link: "/timeline-by-thread"},
+        ]
+      },
     ]
   },
   vite: {
