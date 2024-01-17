@@ -1,8 +1,8 @@
-# Run Name Glossary
+# Run Name Explanation
 
-* `(N)` represents the number of a run, for example, `(1)`. The number generally goes up to 3.
-* `ccN` signifies that the VM option `-XX:CICompilerCount=N` was employed. For instance, `cc2` indicates that `-XX:CICompilerCount=2` was used.
-* `tc` denotes that the VM option `-XX:-TieredCompilation` was not used. Note that [Tiered Compilation](https://stackoverflow.com/a/38721975) is enabled by default.
+* `(N)` is a placeholder for a run number, like `(1)`. It typically ranges up to 3.
+* `ccN` means the VM option `-XX:CICompilerCount=N` was used. So `cc2` means `-XX:CICompilerCount=2` was used.
+* `tc` indicates the absence of the VM option `-XX:-TieredCompilation`. Note that [Tiered Compilation](https://stackoverflow.com/a/38721975) is enabled by default.
+* `rcsN` means the VM option `-XX:ReservedCodeCacheSize=N` was used. So `rcs512` means `-XX:CICompilerCount=512` was used.
 
-For each scenario, three runs are performed to ensure that JIT behavior is consistent.
-
+In each case, we conduct three runs to verify the JIT behavior's uniformity.

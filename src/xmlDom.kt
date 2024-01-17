@@ -39,8 +39,6 @@ data class XmlElement(
 
   fun getAttributeValue(name: String): String? = attributes.get(name)
 
-  fun getAttributeValue(name: String, defaultValue: String?): String? = attributes.get(name) ?: defaultValue
-
   fun getChild(name: String): XmlElement? = children.firstOrNull { it.name == name }
 
   // should not be used - uncomment for migration
@@ -49,7 +47,7 @@ data class XmlElement(
   fun children(name: String): Sequence<XmlElement> = children.asSequence().filter { it.name == name }
 }
 
-fun readXmlAsModel(reader: XMLStreamReader2, rootName: String?): XmlElement {
+fun readXmlAsModel(reader: XMLStreamReader2, rootName: String?, wantedTags: Set<String>): XmlElement {
   val fragment = XmlElementBuilder(name = rootName ?: "", attributes = readAttributes(reader = reader))
   var current = fragment
   val stack = ArrayDeque<XmlElementBuilder>()
@@ -59,6 +57,11 @@ fun readXmlAsModel(reader: XMLStreamReader2, rootName: String?): XmlElement {
     when (reader.next()) {
       XMLStreamConstants.START_ELEMENT -> {
         val name = reader.localName
+        if (depth == 1 && !wantedTags.contains(name)) {
+          reader.skipElement()
+          continue
+        }
+
         val attributes = readAttributes(reader)
         if (reader.isEmptyElement) {
           current.children.add(XmlElement(name = name,

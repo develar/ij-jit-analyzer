@@ -7,6 +7,7 @@
     "build": "vitepress build",
     "preview": "vitepress preview"
   },
+  "type": "module",
   "trustedDependencies": ["duckdb"],
   "dependencies": {
     "echarts": "^5.4.3",
@@ -18,7 +19,7 @@
     "@types/node": "^20.11.5",
     "duckdb": "^0.9.2",
     "duckdb-async": "^0.9.2",
-    "vitepress": "1.0.0-rc.39",
-    "vue": "^3.4.14"
+    "vitepress": "^1.0.0-rc.39",
+    "vue": "^3.4.15"
   }
 }

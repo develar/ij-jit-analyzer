@@ -1,12 +1,16 @@
+@file:Suppress("ReplaceJavaStaticMethodWithKotlinAnalog")
+
 import org.codehaus.stax2.XMLStreamReader2
 import org.duckdb.DuckDBAppender
 import org.duckdb.DuckDBConnection
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.DriverManager
-import javax.swing.text.html.HTML.Tag.SELECT
 import javax.xml.stream.XMLStreamConstants
 import javax.xml.stream.XMLStreamConstants.START_ELEMENT
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.relativeTo
+import kotlin.io.path.walk
 
 fun main() {
   LogParser().parseLine()
@@ -46,10 +50,25 @@ private fun tableSql(name: String, fields: List<Field>): String {
   return "create table $name (${fields.joinToString(separator = ", ") { "${it.name.lowercase()} ${it.type}" }})"
 }
 
+private val factory = { name: String, type: String -> Field(name, type) }
+private val runIdField = factory("runId", "UINTEGER not null")
+
+// no need to use a separate table as DuckDB stores repetitive strings efficiently (see https://duckdb.org/2022/10/28/lightweight-compression.html),
+// but we need to store metadata for run
+private val runFields: List<Field> = listOf(
+  // use runId instead of id to be able to use the simpler USING syntax
+  runIdField,
+  factory("name", "VARCHAR not null"),
+  // in milliseconds
+  factory("start", "UBIGINT not null"),
+  factory("args", "VARCHAR not null"),
+)
+
 // https://wiki.openjdk.org/display/HotSpot/LogCompilation+overview
 class LogParser {
   private val runCountProvider = HashMap<String, Int>()
 
+  @OptIn(ExperimentalPathApi::class)
   fun parseLine() {
     val dbFile = Path.of("log.duckdb").toAbsolutePath()
     println("Write to $dbFile")
@@ -57,9 +76,6 @@ class LogParser {
     val connection = DriverManager.getConnection("jdbc:duckdb:$dbFile") as DuckDBConnection
     //val connection = DriverManager.getConnection("jdbc:duckdb:") as DuckDBConnection
     connection.use {
-      val factory = { name: String, type: String -> Field(name, type) }
-
-      val runIdField = factory("runId", "UINTEGER not null")
       val threadIdField = factory("threadId", "UINTEGER not null")
 
       val taskFields: List<Field> = listOf(
@@ -89,33 +105,31 @@ class LogParser {
         factory("start", "UBIGINT not null"),
       )
 
-      // no need to use a separate table as DuckDB stores repetitive strings efficiently (see https://duckdb.org/2022/10/28/lightweight-compression.html),
-      // but we need to store metadata for run
-      val runFields: List<Field> = listOf(
-        // use runId instead of id to be able to use the simpler USING syntax
-        runIdField,
-        factory("name", "VARCHAR not null"),
-        // in milliseconds
-        factory("start", "UBIGINT not null"),
-      )
-
       connection.createStatement().use {
         it.executeUpdate(tableSql(taskTableName, taskFields))
         it.executeUpdate(tableSql("threads", threadFields))
         it.executeUpdate(tableSql("runs", runFields))
+        it.executeUpdate(tableSql("code_cache", codeCacheFields))
       }
 
       val taskAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, taskTableName)
       val threadAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "threads")
       val runAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "runs")
+      val codeCacheAppender = connection.createAppender(DuckDBConnection.DEFAULT_SCHEMA, "code_cache")
       try {
         val taskTable = TaskTable(taskAppender)
-        val logFiles = Files.newDirectoryStream(Path.of("logs").toAbsolutePath(), "*.log").use { stream -> stream.toList().sortedBy { Files.getLastModifiedTime(it) } }
+        val logDir = Path.of("logs").toAbsolutePath()
+        val logFiles = logDir.walk().toList().sortedBy { Files.getLastModifiedTime(it) }
 
         connection.autoCommit = false
         var runId = 0
         for (logFile in logFiles) {
-          val reader = createXmlReader(inputStream = Files.newInputStream(logFile), publicId = logFile.fileName.toString())
+          val id = logFile.relativeTo(logDir).toString()
+          if (!id.endsWith(".log")) {
+            continue
+          }
+
+          val reader = createXmlReader(inputStream = Files.newInputStream(logFile), publicId = id)
           try {
             read(
               runId = runId++,
@@ -124,6 +138,7 @@ class LogParser {
               runCountProvider = runCountProvider,
               threadAppender = threadAppender,
               runAppender = runAppender,
+              codeCacheAppender = codeCacheAppender,
             )
           }
           finally {
@@ -135,10 +150,15 @@ class LogParser {
         taskAppender.close()
         threadAppender.close()
         runAppender.close()
+        codeCacheAppender.close()
       }
     }
   }
 }
+
+private val taskChildTags = java.util.Set.of("task_done", "failure", "code_cache")
+
+internal class VmInfo(@JvmField var maxCodeCacheSize: Int = -1)
 
 private fun read(
   runId: Int,
@@ -147,12 +167,16 @@ private fun read(
   runCountProvider: MutableMap<String, Int>,
   threadAppender: DuckDBAppender,
   runAppender: DuckDBAppender,
+  codeCacheAppender: DuckDBAppender,
 ) {
   var run = ""
+  var vmVersion = ""
   var vmStart = -1L
 
   var threadId = -1
   var threadName = ""
+
+  val info = VmInfo()
 
   while (reader.hasNext()) {
     val state = reader.next()
@@ -168,29 +192,21 @@ private fun read(
           }
 
           "vm_version" -> {
-            val vmVersion = readXmlAsModel(reader, reader.localName)
-            run = vmVersion.getChild("release")!!.content!!.trim()
+            val vmVersionDom = readXmlAsModel(reader, reader.localName, java.util.Set.of("release"))
+            vmVersion = vmVersionDom.getChild("release")!!.content!!.trim()
           }
 
           "args" -> {
             assert(reader.next() == XMLStreamConstants.CHARACTERS)
             val args = reader.text
-            compilerCountRegex.find(args)?.let {
-              run += " cc${it.groups[1]!!.value}"
-            }
-
-            val tieredCompilationMatch = tieredCompilationRegex.find(args)
-            if (tieredCompilationMatch == null || tieredCompilationMatch.groups.get(1)!!.value == "+") {
-              run += " tc"
-            }
-
-            run += " (" + runCountProvider.compute(run) { _, value -> (value ?: 0) + 1 } + ")"
+            run = computeRunName(args = args, runCountProvider = runCountProvider, info = info, vmVersion = vmVersion)
 
             assert(vmStart != -1L)
             runAppender.beginRow()
             runAppender.append(runId)
             runAppender.append(run)
             runAppender.append(vmStart)
+            runAppender.append(args)
             runAppender.endRow()
           }
 
@@ -223,7 +239,7 @@ private fun read(
           "task" -> {
             val start = readTaskAttributes(reader = reader, task = task)
 
-            val dom = readXmlAsModel(reader, "task")
+            val dom = readXmlAsModel(reader, "task", taskChildTags)
             val task_done = dom.getChild("task_done")!!
             val success = task_done.getAttributeValue("success")
             val failure: String?
@@ -257,11 +273,45 @@ private fun read(
               inlinedMethodSize = inlinedMethodSize,
               threadId = threadId,
             )
+
+            dom.getChild("code_cache")?.let {
+              val maxCodeCacheSize = info.maxCodeCacheSize
+              assert(maxCodeCacheSize != -1)
+              writeCodeCache(dom = it, codeCacheAppender = codeCacheAppender, runId = runId, end = end, maxCodeCacheSize = maxCodeCacheSize)
+            }
           }
         }
       }
     }
   }
+}
+
+private val codeCacheFields: List<Field> = listOf(
+  runIdField,
+  // in microseconds
+  factory("time", "UBIGINT not null"),
+
+  factory("blobs", "UINTEGER not null"),
+  factory("methods", "UINTEGER not null"),
+  factory("adapters", "UINTEGER not null"),
+
+  factory("used", "UINTEGER not null"),
+)
+
+private fun writeCodeCache(dom: XmlElement, codeCacheAppender: DuckDBAppender, runId: Int, end: Long, maxCodeCacheSize: Int) {
+  codeCacheAppender.beginRow()
+
+  codeCacheAppender.append(runId)
+  codeCacheAppender.append(end)
+
+  codeCacheAppender.append(dom.getAttributeValue("total_blobs")!!.toInt())
+  @Suppress("SpellCheckingInspection")
+  codeCacheAppender.append(dom.getAttributeValue("nmethods")!!.toInt())
+  codeCacheAppender.append(dom.getAttributeValue("adapters")!!.toInt())
+
+  codeCacheAppender.append(maxCodeCacheSize - dom.getAttributeValue("free_code_cache")!!.toInt())
+
+  codeCacheAppender.endRow()
 }
 
 private fun convertSecondsToMicroseconds(value: Double) = (value * 1_000_000).toLong()
@@ -289,6 +339,3 @@ private fun readTaskAttributes(reader: XMLStreamReader2, task: TaskTable): Long 
   task.beginRow(compileId, method, kind, level)
   return startTime
 }
-
-private val compilerCountRegex = Regex("-XX:CICompilerCount=(\\d+)")
-private val tieredCompilationRegex = Regex("-XX:([-+])TieredCompilation")

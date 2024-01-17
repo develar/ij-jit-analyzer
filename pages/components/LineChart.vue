@@ -10,6 +10,7 @@ import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
 import { useData } from "vitepress"
 import { getFormatter } from "./format"
+import { useResizeObserver } from "./useResizeObserver"
 
 use([TooltipComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer])
 
@@ -23,34 +24,24 @@ const props = withDefaults(defineProps<{
 
 const chartContainer = ref(null)
 
-const numberFormatter = new Intl.NumberFormat()
-
-let resizeObserver: ResizeObserver
-
 let chart: EChartsType | null = null
+
+useResizeObserver(chartContainer, () => {
+  chart?.resize()
+})
 
 onMounted(() => {
   const container = chartContainer.value as HTMLElement
   const {isDark} = useData()
 
   chart = initChart(container, isDark.value)
-  resizeObserver = new ResizeObserver(() => {
-    chart?.resize()
-  })
 
   watch(isDark, isDark => {
     chart?.dispose()
     chart = initChart(chartContainer.value as HTMLElement, isDark)
   })
-  resizeObserver.observe(container)
 })
 onBeforeUnmount(() => {
-  const container = chartContainer.value
-  // noinspection JSIncompatibleTypesComparison
-  if (resizeObserver !== undefined && container != null) {
-    resizeObserver.unobserve(container)
-  }
-
   chart?.dispose()
   chart = null
 })
@@ -78,6 +69,13 @@ function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
     },
     tooltip: {
       trigger: "axis",
+      axisPointer: {
+        label: {
+          formatter: function (params) {
+            return xFormatter(params.value)
+          }
+        }
+      },
       valueFormatter: yFormatter,
     },
     yAxis: {

@@ -4,84 +4,69 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components"
+import { DatasetComponent, GridComponent, LegendComponent, TooltipComponent } from "echarts/components"
 import { BarChart } from "echarts/charts"
 import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
 import { useData } from "vitepress"
 import { getFormatter } from "./format"
+import { useResizeObserver } from "./useResizeObserver"
 
-use([TooltipComponent, LegendComponent, GridComponent, BarChart, CanvasRenderer])
+use([TooltipComponent, DatasetComponent, LegendComponent, GridComponent, BarChart, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   data: object
-  x: string,
-  y: string,
-  series?: string,
-  yFormat?: "time",
+  stack?: boolean,
+  yFormat?: "time" | "bytes",
 }>(), {
+  stack: false,
 })
+
+const {isDark} = useData()
 
 const chartContainer = ref(null)
 
-const numberFormatter = new Intl.NumberFormat()
-
-let resizeObserver: ResizeObserver
-
-// without unit for brevity
-function formatBarLabel(value: number): string {
-  return numberFormatter.format(value)
-}
-
 let chart: EChartsType | null = null
+
+useResizeObserver(chartContainer, () => {
+  chart?.resize()
+})
 
 onMounted(() => {
   const container = chartContainer.value as HTMLElement
-  const {isDark} = useData()
-
   chart = initChart(container, isDark.value)
-  resizeObserver = new ResizeObserver(() => {
-    chart?.resize()
-  })
-
   watch(isDark, isDark => {
     chart?.dispose()
     chart = initChart(chartContainer.value as HTMLElement, isDark)
   })
-  resizeObserver.observe(container)
 })
 onBeforeUnmount(() => {
-  const container = chartContainer.value
-  // noinspection JSIncompatibleTypesComparison
-  if (resizeObserver !== undefined && container != null) {
-    resizeObserver.unobserve(container)
-  }
-
   chart?.dispose()
   chart = null
 })
 
 function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
-  if (props.series == undefined) {
-    return initNonStackedChart(container, isDark)
+  if (props.stack === true) {
+    return initStackedChart(container, isDark)
   }
   else {
-    return initStackedChart(container, isDark)
+    return initNonStackedChart(container, isDark)
   }
 }
 
 function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsType {
-  const data = props.data
+  const data = props.data as Array<[string, Array<number>]>
   const chart = init(container, isDark ? "dark" : null)
 
   // remove suffix ` (N)`
-  const groups = [...new Set(data.map(it => it[props.x].replace(/ \(\d+\)$/, "")))]
+  const groups = [...new Set(data.map(it => it[0].replace(/ \(\d+\)$/, "")))]
+  const yFormatter = getFormatter(props.yFormat)
   const seriesData = groups.map(group => {
     const d = []
     for (const item of data) {
-      const name = item[props.x]
+      const name = item[0]
       if (name.startsWith(group)) {
-        d.push([name, item[props.y]])
+        d.push([name, ...item[1]])
       }
     }
 
@@ -92,12 +77,11 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
       label: {
         show: true,
         position: "top",
-        formatter: params => formatBarLabel(params.value[1])
+        formatter: yFormatter == null ? undefined : params => yFormatter(params.value[1])
       },
     }
   })
 
-  const yFormatter = getFormatter(props.yFormat)
   const option = {
     tooltip: {
       axisPointer: {
@@ -123,25 +107,17 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
 
 function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
   const data = props.data
+  const categories: Array<string> = data[0].slice(1)
 
-  const xAxisData = [...new Set(data.map(item => item[props.x]))]
+  const yFormatter = getFormatter(props.yFormat)
 
-  const seriesPropertyName = props.series
-  const categories = [...new Set(data.map(item => item[seriesPropertyName]))]
-  // sort to ensure stable order of legend (as user data maybe sorted by several fields)
-  categories.sort((a, b) => a.localeCompare(b))
-
-  const total = new Array(xAxisData.length).fill(0)
-
-  const seriesData = categories.map(category => {
-    const values = []
-    for (const item of data) {
-      if (item[seriesPropertyName] === category) {
-        const index = xAxisData.indexOf(item[props.x])
-        const v = item[props.y]
-        values[index] = v
-        total[index] += v
-      }
+  const seriesData: any = categories.map((category) => {
+    let formatter: (params) => string
+    if (category === "total") {
+      formatter = (params) => yFormatter(params.data.slice(1).reduce((a, b) => a + ((b != null) ? b : 0), 0))
+    }
+    else {
+      formatter = (params) => yFormatter(params.data[params.seriesIndex + 1])
     }
 
     return {
@@ -149,46 +125,52 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       type: "bar",
       stack: "total",
       label: {
-        show: true,
-        position: "inside",
-        formatter: (params) => formatBarLabel(params.value)
+        // show: true,
+        position: category === "total" ? "top" : "inside",
+        formatter: formatter,
       },
-      data: values
     }
   })
 
-  const valueFormatter = getFormatter("time")
-  const totalSeriesData = {
-    name: "Total",
-    type: "bar",
-    stack: "total",
-    label: {
-      show: true,
-      position: "top",
-      formatter: params => valueFormatter(total[params.dataIndex]),
-    },
-    tooltip: {
-      show: false,
-    },
-    // must be 0 to not draw bar
-    data: total.map(_ => 0),
-  }
-  seriesData.push(totalSeriesData as any)
-
-  const yFormatter = getFormatter(props.yFormat)
   const option = {
+    dataset: {
+      source: data,
+    },
     tooltip: {
       trigger: "axis",
       axisPointer: {
         type: "shadow"
       },
-      // `-` indicate missing value
-      // no easy way to filter out from tooltip, but it maybe even better - tooltip height is the same for all series
-      valueFormatter: it => it === undefined ? "-" : valueFormatter(it),
+      // override default to skip series without value
+      formatter: params => {
+        if (params.length === 0) {
+          return ""
+        }
+
+        let tooltipMarkup = `<div style="line-height: 1.5">${params[0].name}`
+        for (const param of params) {
+          if (param.seriesName === "total") {
+            continue
+          }
+
+          const value = param.data[param.seriesIndex + 1]
+          if (value != null) {
+            const formattedValue = yFormatter == null ? value : yFormatter(value)
+            tooltipMarkup += `
+            <div>${param.marker}<span
+              style="margin-left:2px">${param.seriesName}</span><span
+              style="float: right; margin-left:20px; font-weight: 900">${formattedValue}</span>
+              <div style="clear:both"></div>
+            </div>`
+          }
+        }
+        tooltipMarkup += "</div>"
+        return tooltipMarkup
+      }
     },
     legend: {
       // explicitly set to not include `total` series
-      data: categories,
+      data: categories.slice(0, categories.length - 1),
     },
     grid: {
       left: "5%",
@@ -197,14 +179,14 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       containLabel: true
     },
     xAxis: {
-      type: "category",
-      data: xAxisData
-    },
-    yAxis: {
       type: "value",
       axisLabel: {
         formatter: yFormatter,
       }
+    },
+    yAxis: {
+      type: "category",
+      inverse: true,
     },
     series: seriesData
   }

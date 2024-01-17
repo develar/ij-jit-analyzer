@@ -1,8 +1,11 @@
-import { groupData, openDb } from "./components/db"
+import { naturalStringSort, groupData, openDb, databaseFilePath } from "./components/db"
+import { defineLoader } from "vitepress"
 
 // please note - duration maybe `0` even for successful tasks (not clear why - or because too fast and recorded with the same stamp, or due to another reason);
 // that's why we do not use `where duration != 0`
-export default {
+export default defineLoader({
+  watch: [databaseFilePath],
+
   async load() {
     const db = await openDb()
     // language=GenericSQL
@@ -44,7 +47,7 @@ export default {
       threads, size,
     }
   }
-}
+})
 
 function groupAndSortThreads(threads: any[]) {
   for (let i = 0; i < threads.length; i++) {
