@@ -9,13 +9,13 @@ import BarChart from "./components/BarChart.vue"
 
 ## How much time consumed for JIT compilation?
 
-<BarChart :data="data.duration" x="run" y="duration" series="category"/>
+<BarChart :data="data.duration" x="run" y="duration" series="category" y-format="time"/>
 
 ## How much of compilation time is wasted?
 
 A compilation task may fail due to various reasons. This means that the result of the compilation is not utilized, resulting in wasted CPU resources.
 
-<BarChart :data="data.failedTaskDuration" x="run" y="duration" series="category"/>
+<BarChart :data="data.failedTaskDuration" x="run" y="duration" series="category" y-format="time"/>
 
 ## How many stale tasks?
 

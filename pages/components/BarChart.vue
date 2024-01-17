@@ -9,14 +9,17 @@ import { BarChart } from "echarts/charts"
 import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
 import { useData } from "vitepress"
+import { getFormatter } from "./format"
 
 use([TooltipComponent, LegendComponent, GridComponent, BarChart, CanvasRenderer])
 
-const props = defineProps({
-  x: {type: String, required: true},
-  y: {type: String, required: true},
-  series: {type: String, required: false},
-  data: {type: Object, required: true},
+const props = withDefaults(defineProps<{
+  data: object
+  x: string,
+  y: string,
+  series?: string,
+  yFormat?: "time",
+}>(), {
 })
 
 const chartContainer = ref(null)
@@ -24,10 +27,6 @@ const chartContainer = ref(null)
 const numberFormatter = new Intl.NumberFormat()
 
 let resizeObserver: ResizeObserver
-
-function formatValue(value: number) {
-  return formatBarLabel(value) + " ms"
-}
 
 // without unit for brevity
 function formatBarLabel(value: number): string {
@@ -75,7 +74,6 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
   const data = props.data
   const chart = init(container, isDark ? "dark" : null)
 
-
   // remove suffix ` (N)`
   const groups = [...new Set(data.map(it => it[props.x].replace(/ \(\d+\)$/, "")))]
   const seriesData = groups.map(group => {
@@ -86,6 +84,7 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
         d.push([name, item[props.y]])
       }
     }
+
     return {
       name: group,
       data: d,
@@ -98,24 +97,26 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
     }
   })
 
-  let option = {
+  const yFormatter = getFormatter(props.yFormat)
+  const option = {
     tooltip: {
       axisPointer: {
         type: "shadow"
       },
-      valueFormatter: formatValue,
     },
     legend: {},
     xAxis: {
       type: "category",
-      // data: data.map(item => item[props.x])
     },
     yAxis: {
-      type: "value"
+      type: "value",
+      axisLabel: {
+        formatter: yFormatter,
+      }
     },
     series: seriesData,
   }
-  console.log({option, data})
+  // console.log({option, data})
   chart.setOption(option)
   return chart
 }
@@ -156,6 +157,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
     }
   })
 
+  const valueFormatter = getFormatter("time")
   const totalSeriesData = {
     name: "Total",
     type: "bar",
@@ -163,7 +165,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
     label: {
       show: true,
       position: "top",
-      formatter: params => formatValue(total[params.dataIndex]),
+      formatter: params => valueFormatter(total[params.dataIndex]),
     },
     tooltip: {
       show: false,
@@ -173,6 +175,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
   }
   seriesData.push(totalSeriesData as any)
 
+  const yFormatter = getFormatter(props.yFormat)
   const option = {
     tooltip: {
       trigger: "axis",
@@ -181,7 +184,7 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       },
       // `-` indicate missing value
       // no easy way to filter out from tooltip, but it maybe even better - tooltip height is the same for all series
-      valueFormatter: it => it === undefined ? "-" : formatValue(it),
+      valueFormatter: it => it === undefined ? "-" : valueFormatter(it),
     },
     legend: {
       // explicitly set to not include `total` series
@@ -198,7 +201,10 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       data: xAxisData
     },
     yAxis: {
-      type: "value"
+      type: "value",
+      axisLabel: {
+        formatter: yFormatter,
+      }
     },
     series: seriesData
   }

@@ -10,13 +10,15 @@
   "trustedDependencies": ["duckdb"],
   "dependencies": {
     "echarts": "^5.4.3",
-    "inter-ui": "^4.0.1"
+    "inter-ui": "^4.0.1",
+    "pretty-bytes": "^6.1.1",
+    "pretty-ms": "^8.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.3",
+    "@types/node": "^20.11.5",
     "duckdb": "^0.9.2",
     "duckdb-async": "^0.9.2",
-    "vitepress": "1.0.0-rc.36",
+    "vitepress": "1.0.0-rc.39",
     "vue": "^3.4.14"
   }
 }

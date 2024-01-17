@@ -7,14 +7,18 @@ export default defineConfig({
   cleanUrls: true,
   description: "JIT compilation log analyzer",
   themeConfig: {
+    search: {
+      provider: "local"
+    },
     sidebar: [
       {text: "Glossary", link: "/"},
       {text: "Spent Time", link: "/duration"},
       {
         text: "Timeline",
         link: "/timeline",
-        items:[
-          {text: "Timeline by Thread", link: "/timeline-by-thread"},
+        items: [
+          {text: "Timeline by Thread (count)", link: "/timeline-by-thread"},
+          {text: "Timeline by Thread (size)", link: "/timeline-by-thread-size"},
         ]
       },
     ]

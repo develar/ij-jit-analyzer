@@ -9,12 +9,14 @@ import { LineChart } from "echarts/charts"
 import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
 import { useData } from "vitepress"
+import { getFormatter } from "./format"
 
 use([TooltipComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   data: object
-  endLabel?: boolean
+  endLabel?: boolean,
+  yFormat?: "bytes",
 }>(), {
   endLabel: true,
 })
@@ -24,15 +26,6 @@ const chartContainer = ref(null)
 const numberFormatter = new Intl.NumberFormat()
 
 let resizeObserver: ResizeObserver
-
-function formatValue(value: number) {
-  return formatBarLabel(value) + " ms"
-}
-
-// without unit for brevity
-function formatBarLabel(value: number): string {
-  return numberFormatter.format(value)
-}
 
 let chart: EChartsType | null = null
 
@@ -74,14 +67,24 @@ function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
     legend.selected = legendState
   }
 
+  const xFormatter = getFormatter("time")
+  const yFormatter = getFormatter(props.yFormat)
   const option = {
     xAxis: {
       type: "value",
+      axisLabel: {
+        formatter: xFormatter
+      },
     },
     tooltip: {
       trigger: "axis",
+      valueFormatter: yFormatter,
     },
-    yAxis: {},
+    yAxis: {
+      axisLabel: {
+        formatter: yFormatter
+      },
+    },
     legend,
     series: data.map(item => {
       return {
