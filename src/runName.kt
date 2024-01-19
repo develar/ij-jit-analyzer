@@ -2,8 +2,16 @@ private val codeCacheSizeRegex = Regex("-XX:ReservedCodeCacheSize=(\\d+)m")
 private val compilerCountRegex = Regex("-XX:CICompilerCount=(\\d+)")
 private val tieredCompilationRegex = Regex("-XX:([-+])TieredCompilation")
 
+private val regex = Regex("""(\d{2})[^b]+(b[^.]+).*""")
+
 internal fun computeRunName(args: String, runCountProvider: MutableMap<String, Int>, info: VmInfo, vmVersion: String): String {
-  val result = StringBuilder(vmVersion)
+  // shorten the version to avoid long labels
+  val parsedVersion = regex.matchEntire(vmVersion)!!.groups
+  val result = StringBuilder()
+  result.append(parsedVersion.get(1)!!.value)
+  result.append('.')
+  result.append(parsedVersion.get(2)!!.value)
+
   compilerCountRegex.find(args)?.let {
     result.append(" cc${it.groups[1]!!.value}")
   }

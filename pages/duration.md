@@ -10,15 +10,11 @@ import { data } from "./duration.data"
 import BarChart from "./components/BarChart.vue"
 import LineChart from "./components/LineChart.vue"
 
-const nonStaleDefault = data.nonStale.filter((item, index) => {
-return index === 0 || !item[0].includes("rcs240")
- })
-
 </script>
 
 ## How much time consumed for JIT compilation?
 
-<BarChart :data="nonStaleDefault" :stack="true" y-format="time"/>
+<BarChart :data="data.nonStale" :stack="true" y-format="time"/>
 
 ### Native Method Size
 

@@ -4,7 +4,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 
-import { DatasetComponent, GridComponent, LegendComponent, TooltipComponent } from "echarts/components"
+import { DatasetComponent, GridComponent, LegendComponent, ToolboxComponent, TooltipComponent } from "echarts/components"
 import { BarChart } from "echarts/charts"
 import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
@@ -12,7 +12,7 @@ import { useData } from "vitepress"
 import { getFormatter } from "./format"
 import { useResizeObserver } from "./useResizeObserver"
 
-use([TooltipComponent, DatasetComponent, LegendComponent, GridComponent, BarChart, CanvasRenderer])
+use([TooltipComponent, ToolboxComponent, DatasetComponent, LegendComponent, GridComponent, BarChart, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   data: object
@@ -83,7 +83,22 @@ function initNonStackedChart(container: HTMLElement, isDark: boolean): EChartsTy
   })
 
   const option = {
+    toolbox: {
+      feature: {
+        saveAsImage: {
+          title: "Save as PNG"
+        },
+      }
+    },
+    grid: {
+      left: "5%",
+      // space for end label of total bar
+      right: "5%",
+      bottom: "5%",
+      containLabel: true
+    },
     tooltip: {
+      trigger: "axis",
       axisPointer: {
         type: "shadow"
       },
@@ -125,14 +140,21 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
       type: "bar",
       stack: "total",
       label: {
-        // show: true,
-        position: category === "total" ? "top" : "inside",
+        show: category === "total",
+        position: category === "total" ? "right" : "inside",
         formatter: formatter,
       },
     }
   })
 
   const option = {
+    toolbox: {
+      feature: {
+        saveAsImage: {
+          title: "Save as PNG"
+        }
+      }
+    },
     dataset: {
       source: data,
     },
@@ -174,10 +196,12 @@ function initStackedChart<V>(container: HTMLElement, isDark: boolean): EChartsTy
     },
     grid: {
       left: "5%",
-      right: "5%",
+      // space for end label of total bar
+      right: "9%",
       bottom: "5%",
       containLabel: true
     },
+    // we use x as y and y as x to show horizontal bar for stacked bar
     xAxis: {
       type: "value",
       axisLabel: {

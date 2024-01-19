@@ -4,7 +4,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue"
 
-import { GridComponent, LegendComponent, TooltipComponent } from "echarts/components"
+import { GridComponent, LegendComponent, ToolboxComponent, TooltipComponent } from "echarts/components"
 import { LineChart } from "echarts/charts"
 import { CanvasRenderer } from "echarts/renderers"
 import { EChartsType, init, use } from "echarts/core"
@@ -12,7 +12,7 @@ import { useData } from "vitepress"
 import { getFormatter } from "./format"
 import { useResizeObserver } from "./useResizeObserver"
 
-use([TooltipComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer])
+use([TooltipComponent, ToolboxComponent, LegendComponent, GridComponent, LineChart, CanvasRenderer])
 
 const props = withDefaults(defineProps<{
   data: object
@@ -61,6 +61,13 @@ function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
   const xFormatter = getFormatter("time")
   const yFormatter = getFormatter(props.yFormat)
   const option = {
+    toolbox: {
+      feature: {
+        saveAsImage: {
+          title: "Save as PNG"
+        }
+      }
+    },
     xAxis: {
       type: "value",
       axisLabel: {
