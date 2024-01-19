@@ -6,5 +6,12 @@
 
   /* clear design - remove gray background and add 1px border */
   --vp-custom-block-details-bg: unset;
-  --vp-custom-block-details-border: var(--vp-c-divider)
+  --vp-custom-block-details-border: var(--vp-c-divider);
+
+  /*--vp-sidebar-width: 200px !important;*/
+}
+
+.VPDoc.has-aside .content-container {
+  /* make content more wider (unset max-width: 688px;) */
+  max-width: unset !important;
 }

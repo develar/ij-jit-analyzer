@@ -3,7 +3,13 @@
 <script setup>
 
 import { data } from "./timeline.data"
-import LineChart from "./components/LineChart.vue"
+import SplitLineChart from "./components/SplitLineChart.vue"
+
+// separate experiment about 240 vs 512 cache size
+const patterns = [
+  {pattern: '^21\\.b\\d+ rcs512 \\(\\d+\\)$', not: true},
+  {pattern: '^21\\.b\\d+ (rcs512|rcs240) \\(\\d+\\)$', title: "240 vs 512 code cache size"},
+]
 
 </script>
 
@@ -19,17 +25,17 @@ For the sake of chart readability, only one run per scenario is displayed by def
 
 ## How are non-stale tasks distributed?
 
-<LineChart :data="data.compilation" />
+<SplitLineChart :data="data.compilation" :patterns="patterns"/>
 
 ## How are successful tasks distributed?
 
 See [about wasted compilation time](./duration#how-much-of-compilation-time-is-wasted).
-<LineChart :data="data.successfulCompilation"/>
+<SplitLineChart :data="data.successfulCompilation" :patterns="patterns"/>
 
 ## How are unsuccessful tasks distributed?
 
-<LineChart :data="data.unsuccessfulCompilation"/>
+<SplitLineChart :data="data.unsuccessfulCompilation" :patterns="patterns"/>
 
 ## How are stale tasks distributed?
 
-<LineChart :data="data.staleCompilation"/>
+<SplitLineChart :data="data.staleCompilation" :patterns="patterns"/>

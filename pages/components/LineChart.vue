@@ -85,6 +85,12 @@ function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
       },
       valueFormatter: yFormatter,
     },
+    grid: {
+      left: "5%",
+      right: "5%",
+      bottom: 0,
+      containLabel: true
+    },
     yAxis: {
       axisLabel: {
         formatter: yFormatter
@@ -101,6 +107,9 @@ function initChart<V>(container: HTMLElement, isDark: boolean): EChartsType {
         endLabel: {
           show: props.endLabel,
           formatter: "{a}",
+        },
+        emphasis: {
+          focus: "series"
         },
       }
     }),

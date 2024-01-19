@@ -6,3 +6,5 @@
 * `rcsN` means the VM option `-XX:ReservedCodeCacheSize=N` was used. So `rcs512` means `-XX:CICompilerCount=512` was used.
 
 In each case, we conduct three runs to verify the JIT behavior's uniformity.
+
+In certain sections, we have multiple charts, for example, illustrating the difference between code cache sizes of 512 and 240 for Java version 21. These charts aim to reduce the number of data series.

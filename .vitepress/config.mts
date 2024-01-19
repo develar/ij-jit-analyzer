@@ -7,6 +7,9 @@ export default defineConfig({
   cleanUrls: true,
   description: "JIT compilation log analyzer",
   themeConfig: {
+    socialLinks: [
+      {icon: "github", link: "https://github.com/develar/ij-jit-analyzer"},
+    ],
     search: {
       provider: "local"
     },
@@ -14,9 +17,8 @@ export default defineConfig({
       {text: "Glossary", link: "/"},
       {text: "Spent Time", link: "/duration"},
       {
-        text: "Timeline",
-        link: "/timeline",
         items: [
+          {text: "Timeline", link: "/timeline"},
           {text: "Timeline by Thread (count)", link: "/timeline-by-thread"},
           {text: "Timeline by Thread (size)", link: "/timeline-by-thread-size"},
         ]
