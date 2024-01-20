@@ -17,11 +17,16 @@ fun main() {
 }
 
 private class TaskTable(private val appender: DuckDBAppender) {
-  fun beginRow(id: Int, method: String?, kind: String?, level: Int) {
+  fun beginRow(id: Int, method: String, kind: String?, level: Int) {
     appender.beginRow()
 
     appender.append(id)
-    appender.append(method)
+
+    val spaceIndex = method.indexOf(' ')
+    assert(spaceIndex > 0)
+    appender.append(method.substring(0, spaceIndex))
+    appender.append(method.substring(spaceIndex + 1))
+
     appender.append(kind)
     appender.append(level)
   }
@@ -80,6 +85,7 @@ class LogParser {
 
       val taskFields: List<Field> = listOf(
         factory("id", "UINTEGER not null"),
+        factory("class", "VARCHAR not null"),
         factory("method", "VARCHAR not null"),
         factory("kind", "VARCHAR"),
         factory("level", "UTINYINT"),
@@ -169,7 +175,6 @@ private fun read(
   runAppender: DuckDBAppender,
   codeCacheAppender: DuckDBAppender,
 ) {
-  var run = ""
   var vmVersion = ""
   var vmStart = -1L
 
@@ -199,7 +204,7 @@ private fun read(
           "args" -> {
             assert(reader.next() == XMLStreamConstants.CHARACTERS)
             val args = reader.text
-            run = computeRunName(args = args, runCountProvider = runCountProvider, info = info, vmVersion = vmVersion)
+            val run = computeRunName(args = args, runCountProvider = runCountProvider, info = info, vmVersion = vmVersion)
 
             assert(vmStart != -1L)
             runAppender.beginRow()
@@ -336,6 +341,6 @@ private fun readTaskAttributes(reader: XMLStreamReader2, task: TaskTable): Long 
   }
 
   assert(startTime >= -0)
-  task.beginRow(compileId, method, kind, level)
+  task.beginRow(id = compileId, method = method!!, kind = kind, level = level)
   return startTime
 }
