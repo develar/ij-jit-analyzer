@@ -25,7 +25,7 @@ internal fun computeRunName(args: String, runCountProvider: MutableMap<String, I
   val codeCacheSizeMatch = codeCacheSizeRegex.find(args)
   if (codeCacheSizeMatch == null) {
     // The default maximum code cache size is 240 MB; if you disable tiered compilation with the option -XX:-TieredCompilation, then the default size is 48 MB
-    val sizeInMb = if (isTieredCompilation) 48 else 240
+    val sizeInMb = if (isTieredCompilation) 240 else 48
     info.maxCodeCacheSize = sizeInMb * 1024 * 1024
     result.append(" rcs$sizeInMb")
   }
